@@ -1,7 +1,6 @@
 package org.example
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.{Future, ExecutionContext}
-import scala.concurrent.{Await, Future, Promise}
+import scala.concurrent.{Await, ExecutionContext, Promise}
 import scala.concurrent.duration.Duration
 import scala.util.{Using, Try, Success, Failure}
 import scala.util.control.Exception
@@ -54,24 +53,22 @@ def dropCreate(sql: SqlClient, t: Table)(implicit
   val create = s"CREATE TABLE ${t.getTableName} ${t.getFormat}"
 
   println(s"drop ${t.getTableName}")
-  val dropFuture = Future {
+  Try {
     val transaction = sql.createTransaction().await
     transaction.executeStatement(drop).await
     transaction.commit().await
     transaction.close()
-  }
-  dropFuture.recover { case e: Exception =>
+  } recover { case e: Exception =>
     println(e.getMessage)
   }
 
   println(s"create ${t.getTableName}")
-  val createFuture = Future {
+  Try {
     val transaction = sql.createTransaction().await
     transaction.executeStatement(create).await
     transaction.commit().await
     transaction.close()
-  }
-  createFuture.recover { case e: Exception =>
+  } recover { case e: Exception =>
     println(e.getMessage)
   }
 }
@@ -80,7 +77,7 @@ def insert(kvs: KvsClient, table: Table)(implicit
     ec: ExecutionContext
 ): Unit = {
   println(s"insert ${table.getTableName}")
-  val insertFuture = Future {
+  Try {
     val tx = kvs.beginTransaction().await
     (0 until table.getColumnCount).foreach { i =>
       val record = table.createRecordBuffer(i)
@@ -88,8 +85,7 @@ def insert(kvs: KvsClient, table: Table)(implicit
     }
     kvs.commit(tx).await
     tx.close()
-  }
-  insertFuture.recover { case e: Exception =>
+  } recover { case e: Exception =>
     println(e.getMessage)
   }
 }
@@ -145,7 +141,7 @@ def main(args: Array[String]): Unit = {
     case Success(_)         =>
     case Failure(exception) => println(s"error : ${exception.getMessage}")
   }
-
+  
   val connector = TsurugiConnector.of(endpoint)
   val list = List(
     new Setting(TgTmSetting.ofAlways(TgTxOption.ofRTX()), "RTX"),
@@ -167,4 +163,5 @@ def main(args: Array[String]): Unit = {
     case Success(_)         =>
     case Failure(exception) => println(s"error : ${exception.getMessage}")
   }
+  
 }
